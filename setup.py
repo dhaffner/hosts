@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(name='hosts',
       version='0.1',
-      description='A small tool for organizing the hosts file',
+      description='A command-line tool for organizing the hosts file.',
       url='http://github.com/dhaffner/hosts.py',
       author='Dustin Haffner',
       author_email='dh@xix.org',

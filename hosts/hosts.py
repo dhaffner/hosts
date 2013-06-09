@@ -18,16 +18,22 @@ def compose(*funcs):
 
 _open = '# <{}>'.format
 _close = '# </{}>'.format
-_match_close = re.compile('#\s*</?([\w\-]+)>')
+
+_match_close = re.compile('#\s*</([\w\-]+)>')
 _match_open = re.compile('#\s*<([\w\-]+)>')
+_match_slug = re.compile('#\s*</?([\w\-]+)>')
+
 _comment = re.compile('#+(.+)')
 _iscomment = methodcaller('startswith', '#')
 _strip = methodcaller('strip')
 _split = methodcaller('split', '.')
+_join = '.'.join
 
 
-def _get_slug(text, pattern=re.compile('# </?([\w\-]+)>')):
-    return pattern.search(text).group(1)
+def _get_slug(text, pattern=_match_slug):
+    search = pattern.search(text)
+    if search:
+        return search.group(1)
 
 
 def _filter_path(path, slug=re.compile('^\w')):
@@ -88,7 +94,7 @@ def _read_hosts(filename):
     return tuple(hosts)
 
 
-def _read_structure(infile, include_hosts=True):
+def _read_structure(infile=None, include_hosts=True):
     '''Determine and return the organizational structure from a given
     host file.
     '''
@@ -147,7 +153,7 @@ def _sift_structure(func, structure, transform):
         prev_section = section
 
     if prev_section:
-        for s in prev_section[1::-1]:
+        for s in reversed(prev_section[1:]):
             print _close(s)
 
 
@@ -243,8 +249,10 @@ def generate(dirname, *excludes):
 
 
 @baker.command
-def read(infile=None):
-    return _read_structure(include_hosts=False)
+def paths(infile='/etc/hosts'):
+    structure = _read_structure(infile, include_hosts=False)
+    for path in map(_join, structure):
+        print path
 
 
 @baker.command
@@ -261,7 +269,6 @@ def disable(infile='/etc/hosts', *excludes):
     structure = _read_structure(infile, include_hosts=True)
     excludes = list(map(_split, excludes))
     sift = lambda h: _path_in_list(h, excludes)
-
     _sift_structure(sift, structure, _add_comment)
 
 
