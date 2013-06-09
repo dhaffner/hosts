@@ -16,18 +16,17 @@ def compose(*funcs):
     return reduce(lambda f, g: lambda x: f(g(x)), funcs)
 
 
-_open = '# <{}>'.format
-_close = '# </{}>'.format
-
 _match_close = re.compile('#\s*</([\w\-]+)>')
 _match_open = re.compile('#\s*<([\w\-]+)>')
 _match_slug = re.compile('#\s*</?([\w\-]+)>')
+_match_comment = re.compile('#+(.+)')
 
-_comment = re.compile('#+(.+)')
 _iscomment = methodcaller('startswith', '#')
+_open = '# <{}>'.format
+_close = '# </{}>'.format
+_join = '.'.join
 _strip = methodcaller('strip')
 _split = methodcaller('split', '.')
-_join = '.'.join
 
 
 def _get_slug(text, pattern=_match_slug):
@@ -157,11 +156,6 @@ def _sift_structure(func, structure, transform):
             print _close(s)
 
 
-def _write_hosts(outfile, structure):
-    for section, hosts in structure:
-        pass
-
-
 def _common_path(path1, path2):
     for a, b in zip(path1, path2):
         if a == b:
@@ -183,7 +177,7 @@ def _path_in_list(path, excludes):
 
 
 def _scrub_comment(line):
-    match = _comment.match(line)
+    match = _match_comment.match(line)
     if match:
         return match.group(1)
     return line
