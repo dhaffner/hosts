@@ -1,9 +1,9 @@
-#!/usr/bin/env python
-
 import os
 import os.path
 import re
+import shutil
 
+from datetime import datetime
 from itertools import ifilterfalse as filterfalse
 from operator import methodcaller
 
@@ -12,8 +12,82 @@ import baker
 from six.moves import map, filter, zip
 
 
-def compose(*funcs):
-    return reduce(lambda f, g: lambda x: f(g(x)), funcs)
+#
+#   Commands
+#
+
+
+@baker.command
+def generate(dirname, *excludes):
+    '''Generate and output a hosts file from the given directory and
+    exclusion list.
+    '''
+
+    def scrub(section):
+        return section[1:].split('.')
+
+    excludes = map(scrub, filter(methodcaller('startswith', '-'), excludes))
+
+    lines = _build_hosts_file(dirname, excludes=list(excludes))
+    for line in lines:
+        print line
+
+
+@baker.command
+def paths(infile='/etc/hosts'):
+    '''Read and print paths from the given hosts file.'''
+
+    structure = _read_structure(infile, include_hosts=False)
+    for path in map(_join, structure):
+        print path
+
+
+@baker.command
+def enable(infile='/etc/hosts', *includes):
+    '''Enable the given paths in the specified hosts file.'''
+
+    structure = _read_structure(infile, include_hosts=True)
+    includes = list(map(_split, includes))
+    sift = lambda h: _path_in_list(h, includes)
+
+    _sift_structure(sift, structure, _scrub_comment)
+
+
+@baker.command
+def disable(infile='/etc/hosts', *excludes):
+    '''Disable the given paths in the specified hosts file.'''
+
+    structure = _read_structure(infile, include_hosts=True)
+    excludes = list(map(_split, excludes))
+    sift = lambda h: _path_in_list(h, excludes)
+    _sift_structure(sift, structure, _add_comment)
+
+
+@baker.command
+def install(filename, destination='/etc/hosts'):
+    '''Install (copy) a specified hosts file into the given destination
+    (default /etc/hosts).
+    '''
+
+    shutil.copy(filename, destination)
+    print("{} -> {}".format(filename, destination))
+
+
+@baker.command
+def backup(directory="./", infile='/etc/hosts'):
+    '''Backup the hosts file to a given directory (default current
+    directory).
+    '''
+
+    isoformat = datetime.now().isoformat()
+    destination = os.path.join(directory, "hosts-{}".format(isoformat))
+    shutil.copy(infile, destination)
+    print("{} -> {}".format(infile, destination))
+
+
+#
+#   Helpers
+#
 
 
 _match_close = re.compile('#\s*</([\w\-]+)>')
@@ -227,43 +301,6 @@ def _build_hosts_file(dirname, excludes=None):
         extend(map(_close, reversed(parents)))
 
     return lines
-
-
-@baker.command
-def generate(dirname, *excludes):
-
-    def scrub(section):
-        return section[1:].split('.')
-
-    excludes = map(scrub, filter(methodcaller('startswith', '-'), excludes))
-
-    lines = _build_hosts_file(dirname, excludes=list(excludes))
-    for line in lines:
-        print line
-
-
-@baker.command
-def paths(infile='/etc/hosts'):
-    structure = _read_structure(infile, include_hosts=False)
-    for path in map(_join, structure):
-        print path
-
-
-@baker.command
-def enable(infile='/etc/hosts', *includes):
-    structure = _read_structure(infile, include_hosts=True)
-    includes = list(map(_split, includes))
-    sift = lambda h: _path_in_list(h, includes)
-
-    _sift_structure(sift, structure, _scrub_comment)
-
-
-@baker.command
-def disable(infile='/etc/hosts', *excludes):
-    structure = _read_structure(infile, include_hosts=True)
-    excludes = list(map(_split, excludes))
-    sift = lambda h: _path_in_list(h, excludes)
-    _sift_structure(sift, structure, _add_comment)
 
 
 def run():
