@@ -1,88 +1,81 @@
+from __future__ import print_function
+
 import os
 import os.path
 import re
 import shutil
 
 from datetime import datetime
-from itertools import ifilterfalse as filterfalse
 from operator import methodcaller
-
-import baker
 
 from six.moves import map, filter, zip
 
 
 #
-#   Commands
+#   Commands (API)
 #
 
 
-@baker.command
-def generate(dirname, *excludes):
-    '''Generate and output a hosts file from the given directory and
-    exclusion list.
-    '''
-
-    def scrub(section):
-        return section[1:].split('.')
-
-    excludes = map(scrub, filter(methodcaller('startswith', '-'), excludes))
-
-    lines = _build_hosts_file(dirname, excludes=list(excludes))
-    for line in lines:
-        print line
+def show(filename, sections=None):
+    structure = _read_structure_lazy(filename, include_hosts=True)
+    for section, hosts in structure:
+        s = _join(section)
+        if s not in sections:
+            continue
+        print(s)
+        for host in hosts:
+            print(' -', host)
 
 
-@baker.command
-def paths(infile='/etc/hosts'):
-    '''Read and print paths from the given hosts file.'''
-
-    structure = _read_structure(infile, include_hosts=False)
-    for path in map(_join, structure):
-        print path
-
-
-@baker.command
-def enable(infile='/etc/hosts', *includes):
+def enable(filename, sections=None):
     '''Enable the given paths in the specified hosts file.'''
 
-    structure = _read_structure(infile, include_hosts=True)
-    includes = list(map(_split, includes))
-    sift = lambda h: _path_in_list(h, includes)
+    structure = _read_structure_lazy(filename, include_hosts=True)
 
+    sections = list(map(_split, sections))
+    sift = lambda h: _path_in_list(h, sections)
     _sift_structure(sift, structure, _scrub_comment)
 
 
-@baker.command
-def disable(infile='/etc/hosts', *excludes):
+def disable(filename, sections=None):
     '''Disable the given paths in the specified hosts file.'''
 
-    structure = _read_structure(infile, include_hosts=True)
-    excludes = list(map(_split, excludes))
-    sift = lambda h: _path_in_list(h, excludes)
+    structure = _read_structure_lazy(filename, include_hosts=True)
+
+    sections = list(map(_split, sections))
+    sift = lambda h: _path_in_list(h, sections)
     _sift_structure(sift, structure, _add_comment)
 
 
-@baker.command
-def install(filename, destination='/etc/hosts'):
-    '''Install (copy) a specified hosts file into the given destination
-    (default /etc/hosts).
-    '''
+def sections(filename):
+    '''Read and print paths from the given hosts file.'''
 
+    structure = _read_structure_lazy(filename, include_hosts=False)
+    for path in map(_join, structure):
+        print(path)
+
+
+def install(filename, directory):
+    '''Install (copy) a specified hosts file into the given destination.'''
+
+    if directory is None:
+        directory = '/etc/'
+
+    shutil.copy(filename, directory)
+    print("{} -> {}".format(filename, directory))
+
+
+def backup(filename, directory=None):
+    '''Backup the hosts file to a given directory (default current
+    directory).'''
+
+    if directory is None:
+        directory = os.getcwd()
+
+    destination = os.path.join(directory,
+                               "hosts-{}".format(datetime.now().isoformat()))
     shutil.copy(filename, destination)
     print("{} -> {}".format(filename, destination))
-
-
-@baker.command
-def backup(directory="./", infile='/etc/hosts'):
-    '''Backup the hosts file to a given directory (default current
-    directory).
-    '''
-
-    isoformat = datetime.now().isoformat()
-    destination = os.path.join(directory, "hosts-{}".format(isoformat))
-    shutil.copy(infile, destination)
-    print("{} -> {}".format(infile, destination))
 
 
 #
@@ -103,12 +96,6 @@ _strip = methodcaller('strip')
 _split = methodcaller('split', '.')
 
 
-def _get_slug(text, pattern=_match_slug):
-    search = pattern.search(text)
-    if search:
-        return search.group(1)
-
-
 def _filter_path(path, slug=re.compile('^\w')):
     if isinstance(path, basestring):
         path = path.split('/')
@@ -116,65 +103,32 @@ def _filter_path(path, slug=re.compile('^\w')):
     return tuple(filter(slug.match, path))
 
 
-def _read_lines(filename, strip_comments=False):
+def _read_lines_lazy(filename, strip_comments=False):
     with open(filename, 'Ur') as f:
-        lines = f.readlines()
+        if strip_comments:
+            for line in f:
+                ln = _strip(line)
+                if not ln or _iscomment(ln):
+                    continue
+                yield ln
+            return
 
-    lines = filter(len, map(_strip, lines))
-
-    if strip_comments:
-        lines = filterfalse(_iscomment, lines)
-
-    return tuple(lines)
-
-
-def _read_hosts(filename):
-    '''Return all hosts from a given file. All comments and blank lines
-    are stripped.
-    '''
-
-    with open(filename, 'Ur') as f:
-        lines = f.readlines()
-
-    # Strip extraneous whitespace.
-    lines = map(_strip, lines)
-
-    # Filter out blanks.
-    lines = filter(len, lines)
-
-    # Filter out comments.
-    hosts = []
-
-    section_path = []
-    section_hosts = []
-    for line in lines:
-        if not _iscomment(line):
-            section_hosts.append(line)
-            continue
-
-        match = _match_open.search(line)
-        if match is not None:
-            section_path.append(match.group(1))
-            continue
-
-        match = _match_close.search(line)
-        if match is not None:
-            if len(section_hosts):
-                hosts.append((list(section_path), list(section_hosts)))
-                section_hosts = []
-            section_path.pop()
-
-    return tuple(hosts)
+        for line in f:
+            ln = _strip(line)
+            if not ln:
+                continue
+            yield ln
+        return
 
 
-def _read_structure(infile=None, include_hosts=True):
+def _read_structure_lazy(infile=None, include_hosts=True):
     '''Determine and return the organizational structure from a given
     host file.
     '''
 
     path, hosts, structure = [], [], []
 
-    lines = _read_lines(infile)
+    lines = _read_lines_lazy(infile)
     for line in lines:
         if not _iscomment(line):
             if include_hosts:
@@ -189,13 +143,13 @@ def _read_structure(infile=None, include_hosts=True):
         match = _match_close.search(line)
         if match:
             if include_hosts:
-                structure.append((list(path), list(hosts)))
+                yield (list(path), list(hosts))
                 hosts = []
             else:
-                structure.append(list(path))
-            path.pop()
+                yield list(path)
 
-    return tuple(structure)
+            path.pop()
+    return
 
 
 def _sift_structure(func, structure, transform):
@@ -209,25 +163,25 @@ def _sift_structure(func, structure, transform):
             relative_path = section[len(common_path):]
             if len(common_path) == 0:
                 for s in prev_section[:-1]:
-                    print _close(s)
+                    print(_close(s))
         else:
             relative_path = section
 
         for s in relative_path:
-            print _open(s)
+            print(_open(s))
 
         if func(section):
             hosts = map(transform, hosts)
 
         for h in hosts:
-            print h
+            print(h)
 
-        print _close(section[-1])
+        print(_close(section[-1]))
         prev_section = section
 
     if prev_section:
         for s in reversed(prev_section[1:]):
-            print _close(s)
+            print(_close(s))
 
 
 def _common_path(path1, path2):
@@ -261,47 +215,3 @@ def _add_comment(line, format='#'.__add__):
     if _iscomment(line):
         return line
     return format(line)
-
-
-def _build_hosts_file(dirname, excludes=None):
-    lines = list()
-    append, extend = lines.append, lines.extend
-    prev, curr = None, None
-
-    for root, dirs, files in os.walk(dirname):
-
-        curr = list(_filter_path(root))[1:]
-        if prev and (len(prev) > len(curr) or
-                     (len(prev) == len(curr) and prev[-1] != curr[-1])):
-            append(_close(prev[-1]))
-
-        if len(curr):
-            append(_open(curr[-1]))
-
-        elif files.count('localhost'):
-            files.remove('localhost')
-            files.insert(0, 'localhost')
-
-        for filename in files:
-            hosts = _read_lines(os.path.join(root, filename), strip_comments=True)
-
-            section, _ = os.path.splitext(filename)
-            path = curr + [section]
-            if _path_in_list(path, excludes):
-                hosts = map('#'.__add__, hosts)
-
-            append(_open(section))
-            extend(hosts)
-            append(_close(section))
-
-        prev = curr
-
-    if prev:
-        parents = _filter_path(prev)
-        extend(map(_close, reversed(parents)))
-
-    return lines
-
-
-def run():
-    baker.run()
