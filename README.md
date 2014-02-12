@@ -12,6 +12,8 @@ The tool relies on the hosts file being formatted a particular way to denote its
 
 Sections may be nested inside other sections.
 
+This formatting was inspired by the organization used in the [hosts files maintained by Dan Pollock](http://someonewhocares.org/hosts/zero/). Hosts files provided on that site should be usable with this script.
+
 ## Installation
 
 hosts is installable via pip.
@@ -22,7 +24,7 @@ After that, type `hosts -h` to verify that the install completed successfully.
 
 ## Usage
 
-To show the full list of commandline options, run:
+For a full list of options, run:
 
     hosts -h
 
