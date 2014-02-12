@@ -5,8 +5,9 @@ import os.path
 import re
 import shutil
 
-from datetime import datetime
+from math import trunc
 from operator import methodcaller
+from time import time
 
 from six.moves import map, filter, zip
 
@@ -58,10 +59,10 @@ def sections(filename):
 def install(filename, directory):
     '''Install (copy) a specified hosts file into the given destination.'''
 
-    if directory is None:
+    if not directory:
         directory = '/etc/'
 
-    shutil.copy(filename, directory)
+    shutil.copy(filename, os.path.join(directory, 'hosts'))
     print("{} -> {}".format(filename, directory))
 
 
@@ -69,11 +70,10 @@ def backup(filename, directory=None):
     '''Backup the hosts file to a given directory (default current
     directory).'''
 
-    if directory is None:
+    if not directory:
         directory = os.getcwd()
 
-    destination = os.path.join(directory,
-                               "hosts-{}".format(datetime.now().isoformat()))
+    destination = os.path.join(directory, "hosts-{}".format(trunc(time())))
     shutil.copy(filename, destination)
     print("{} -> {}".format(filename, destination))
 

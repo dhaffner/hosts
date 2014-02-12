@@ -1,17 +1,17 @@
 #!/usr/bin/env python
-"""Naval Fate.
+"""hosts.
 
 Usage:
   hosts [--input=<file>] (enable | disable | show) <section>...
-  hosts [--input=<file>] install [directory]
-  hosts [--input=<file>] backup [directory]
+  hosts [--input=<file>] backup <directory>
   hosts [--input=<file>] sections
+  hosts install <file>
+
 
 Options:
   -h --help                 Show this screen.
   -i <file> --input=<file>  The hosts file to use. [default: /etc/hosts]
   --version                 Show version.
-  --verbose                 Show more information to the user.
 """
 from docopt import docopt
 from hosts import hosts
@@ -33,3 +33,9 @@ if __name__ == '__main__':
 
     elif arguments['sections']:
         hosts.sections(input_)
+
+    elif arguments['backup']:
+        hosts.backup(input_, arguments['<directory>'])
+
+    elif arguments['install']:
+        hosts.install(arguments['<file>'])
