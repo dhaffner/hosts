@@ -9,7 +9,5 @@ setup(name='hosts',
       license='MIT',
       packages=['hosts'],
       scripts=['bin/hosts'],
-      install_requires=[
-          'six', 'docopt'
-      ],
+      install_requires=['docopt'],
       zip_safe=False)

@@ -9,7 +9,10 @@ from math import trunc
 from operator import methodcaller
 from time import time
 
-from six.moves import map, filter, zip
+try:
+    from itertools import imap as map, ifilter as filter, izip as zip
+except ImportError:
+    pass
 
 
 #
