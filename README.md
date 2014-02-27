@@ -65,3 +65,9 @@ This command copies a given file to `/etc/hosts`, so it must be run with root pr
     hosts backup ~/.hosts/
     hosts disable work > ~/.hosts/hosts-work
     sudo hosts install ~/.hosts/hosts-work
+
+## TODO / Feature ideas
+
+* Add/remove a given mapping (IP, hostname) to a section of hosts file
+* Show mappings involving a given IP or hostname
+* Optionally install new hosts file after enable/disable/etc action
